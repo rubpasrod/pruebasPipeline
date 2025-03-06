@@ -39,14 +39,13 @@ jobs:
 
       - name: Run SCA with Snyk (Docker)
         run: |
-          docker run --rm -v $(pwd):/project snyk/snyk:alpine test /project --json > snyk-results.json
+          docker run --rm -v $(pwd):/project snyk/snyk:alpine snyk test /project > snyk-results.txt
 
       - name: Upload SCA Results
         uses: actions/upload-artifact@v4
         with:
           name: snyk-results
-          path: snyk-results.json
-
+          path: snyk-results.txt
 
 
   secrets:
