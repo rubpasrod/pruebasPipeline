@@ -7,28 +7,34 @@ on:
 
 jobs:
   sast:
-    name: Run SAST (Semgrep)
-    runs-on: ubuntu-latest
+    name: SAST (Semgrep)
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Semgrep
+      - name: Run Semgrep (SAST)
         run: |
-          # Instalar Semgrep
-          curl -sL https://github.com/returntocorp/semgrep/releases/download/v0.71.0/semgrep-v0.71.0-linux-amd64.tar.gz | tar -xz
-          sudo mv semgrep*/semgrep /usr/local/bin/  # Mover el binario a /usr/local/bin
+          docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep --config=p/ci --json -o semgrep-results.json
 
-      - name: Run SAST with Semgrep
+      - name: Check for Critical Vulnerabilities (Semgrep)
         run: |
-          semgrep --config=p/r2c-security  # Ejecutar el análisis SAST con Semgrep (usando el preset de seguridad)
+          if grep -q '"severity": "ERROR"' semgrep-results.json; then
+            echo "Critical vulnerabilities found by Semgrep!"
+            exit 1
+          fi
 
+      - name: Upload SAST Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-results
+          path: semgrep-results.json
 
   sca:
     name: Run SCA (Snyk)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Run SCA with Snyk
@@ -36,21 +42,33 @@ jobs:
           curl -sL https://github.com/snyk/snyk/releases/download/v1.901.0/snyk-linux.tar.gz | tar xz
           ./snyk test  # Ejecutar análisis de dependencias
 
+      - name: Upload SCA Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-results
+          path: snyk-results.json
+
   secrets:
     name: Run Secrets Scanning (TruffleHog)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Run secrets scanning with TruffleHog
         run: |
           pip install truffleHog
-          trufflehog --git-url https://github.com/rubpasrod/pruebasPipeline.git
+          trufflehog --git-url https://github.com/rubpasrod/pruebasPipeline.git --json > trufflehog-results.json
+
+      - name: Upload Secrets Scan Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-results
+          path: trufflehog-results.json
 
   build:
     name: Build Application
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [sast, sca, secrets]  # Asegurarse de que los análisis previos hayan pasado
     steps:
       - name: Checkout code
@@ -66,7 +84,7 @@ jobs:
 
   pre-deployment:
     name: Pre-Deployment Security Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build  # Asegurarse de que la construcción haya terminado antes de los chequeos de seguridad
     steps:
       - name: Checkout code
@@ -85,7 +103,7 @@ jobs:
 
   test:
     name: Run Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: pre-deployment  # Asegurarse de que los chequeos de pre-deployment hayan pasado
     steps:
       - name: Checkout code
@@ -102,7 +120,7 @@ jobs:
 
   deploy:
     name: Deploy to Production
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: test  # Asegurarse de que no haya fallos en las pruebas
     steps:
       - name: Checkout code
