@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        
+
       - name: Checkout DVWA
         run: git clone https://github.com/digininja/DVWA.git dvwa
 
@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Run Semgrep (SAST)
         run: |
-          docker run --rm -v $(pwd)/dvwa:/src returntocorp/semgrep semgrep --config=p/ci --json > semgrep-results.json
+          docker run --rm -v $(pwd)/dvwa:/src returntocorp/semgrep semgrep --json > semgrep-results.json
 
       - name: Upload SAST Report
         uses: actions/upload-artifact@v4
