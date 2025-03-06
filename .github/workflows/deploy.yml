@@ -38,7 +38,7 @@ jobs:
     steps:
       - name: Run TruffleHog Scan (Secrets)
         run: |
-          cd dvwa
+          cd dvwa  # Ahora estamos seguros de que dvwa existe
           git init
           docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json
 
