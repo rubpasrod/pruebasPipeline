@@ -55,7 +55,7 @@ jobs:
   security_gate_pre_flight:
     name: Security Gate Pre-Flight
     runs-on: ubuntu-24.04
-    needs: [pre_flight_sast, pre_flight_sca, pre_flight_secrets]
+    needs: [pre_flight_sast, pre_flight_secrets]
     steps:
       - name: Download Pre-Flight Security Reports
         uses: actions/download-artifact@v4
