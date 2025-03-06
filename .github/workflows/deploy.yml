@@ -18,6 +18,13 @@ jobs:
     runs-on: ubuntu-24.04
     needs: clone_repo
     steps:
+      - name: Show Current Directory
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Listing files in the current directory:"
+          ls -alh
+
       - name: Run Semgrep (SAST)
         run: |
           cd DVWA  # Cambiar al directorio DVWA
@@ -34,8 +41,12 @@ jobs:
     runs-on: ubuntu-24.04
     needs: clone_repo
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - name: Show Current Directory
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Listing files in the current directory:"
+          ls -alh
 
       - name: Run TruffleHog Scan (Secrets)
         run: |
