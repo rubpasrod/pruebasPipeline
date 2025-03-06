@@ -67,14 +67,8 @@ jobs:
           name: repository-artifact
           path: ./repository
 
-      - name: List files in repository directory
-        run: |
-          ls -alh ./repository  # Verificar que los archivos están presentes
-
       - name: Run TruffleHog Scan
         run: |
-          cd ./repository  # Cambiar al directorio donde se encuentra el código
-          ls -alh          # Verificar que los archivos existen
           docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest \
             git file:///src --json > trufflehog-results.json || echo '{"secrets": []}' > trufflehog-results.json
           # Asegurarse de que el archivo se haya creado, incluso si no se encuentran secretos
