@@ -22,37 +22,37 @@ jobs:
           name: pre-flight-security-reports
           path: semgrep-results.json
 
-pre_flight_secrets:
-  name: Secrets Scanning (TruffleHog)
-  runs-on: ubuntu-24.04
-  steps:
-    - name: Show Current Directory
-      run: |
-        echo "Current directory:"
-        pwd
-        echo "Listing files in the current directory:"
-        ls -alh  # Asegúrate de ver si el directorio DVWA está listado aquí
+  pre_flight_secrets:
+    name: Secrets Scanning (TruffleHog)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Show Current Directory
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Listing files in the current directory:"
+          ls -alh  # Asegúrate de ver si el directorio DVWA está listado aquí
 
-    - name: Verify DVWA Directory Exists
-      run: |
-        if [ -d "DVWA" ]; then
-          echo "DVWA directory exists!"
-        else
-          echo "DVWA directory does not exist."
-          exit 1  # Detener el pipeline si el directorio DVWA no existe
-        fi
+      - name: Verify DVWA Directory Exists
+        run: |
+          if [ -d "DVWA" ]; then
+            echo "DVWA directory exists!"
+          else
+            echo "DVWA directory does not exist."
+            exit 1  # Detener el pipeline si el directorio DVWA no existe
+          fi
 
-    - name: Run TruffleHog Scan (Secrets)
-      run: |
-        cd DVWA  # Cambiar al directorio DVWA si existe
-        git init  # Inicializar el repositorio git dentro de DVWA
-        docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json || echo "No secrets found" > trufflehog-results.json
+      - name: Run TruffleHog Scan (Secrets)
+        run: |
+          cd DVWA  # Cambiar al directorio DVWA si existe
+          git init  # Inicializar el repositorio git dentro de DVWA
+          docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json || echo "No secrets found" > trufflehog-results.json
 
-    - name: Upload Secrets Scan Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: pre-flight-security-reports
-        path: DVWA/trufflehog-results.json
+      - name: Upload Secrets Scan Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-flight-security-reports
+          path: DVWA/trufflehog-results.json
 
   security_gate_pre_flight:
     name: Security Gate Pre-Flight
