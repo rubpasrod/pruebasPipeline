@@ -6,24 +6,16 @@ on:
       - main
 
 jobs:
-  clone_repo:
-    name: Clone Repository
+  pre_flight_sast:
+    name: SAST (Semgrep)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Checkout DVWA
-        run: git clone https://github.com/digininja/DVWA.git dvwa
-
-  pre_flight_sast:
-    name: SAST (Semgrep)
-    runs-on: ubuntu-24.04
-    needs: clone_repo
-    steps:
       - name: Run Semgrep (SAST)
         run: |
-          docker run --rm -v $(pwd)/dvwa:/src returntocorp/semgrep semgrep --json > semgrep-results.json
+          docker run --rm -v $(pwd)/DVWA:/src returntocorp/semgrep semgrep --json > semgrep-results.json
 
       - name: Upload SAST Report
         uses: actions/upload-artifact@v4
@@ -34,11 +26,14 @@ jobs:
   pre_flight_secrets:
     name: Secrets Scanning (TruffleHog)
     runs-on: ubuntu-24.04
-    needs: clone_repo
+    needs: pre_flight_sast
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Run TruffleHog Scan (Secrets)
         run: |
-          cd dvwa  # Ahora estamos seguros de que dvwa existe
+          cd DVWA
           git init
           docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json
 
