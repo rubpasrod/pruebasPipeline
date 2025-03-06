@@ -48,7 +48,7 @@ jobs:
       - name: Run secrets scanning with TruffleHog
         run: |
           pip install truffleHog
-          trufflehog --git-url https://github.com/your-repository.git  # Ejecutar escaneo de secretos
+          trufflehog --git-url https://github.com/rubpasrod/pruebasPipeline.git
 
   build:
     name: Build Application
