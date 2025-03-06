@@ -40,7 +40,6 @@ jobs:
       - name: Run secrets scanning with TruffleHog
         run: |
           pip install truffleHog
-          trufflehog -h
           trufflehog https://github.com/rubpasrod/pruebasPipeline.git --json > trufflehog-results.json
 
       - name: Upload Secrets Scan Report
@@ -48,6 +47,7 @@ jobs:
         with:
           name: trufflehog-results
           path: trufflehog-results.json
+
 
   build:
     name: Build Application
