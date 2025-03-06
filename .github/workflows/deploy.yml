@@ -25,7 +25,7 @@ jobs:
   pre_flight_sast:
     name: SAST (Semgrep)
     runs-on: ubuntu-24.04
-    needs: checkout  # Este job depende del job "checkout"
+    needs: checkout
     steps:
       - name: Download Repository Artifact
         uses: actions/download-artifact@v4
@@ -59,7 +59,7 @@ jobs:
   pre_flight_secrets:
     name: Secrets Scanning (TruffleHog)
     runs-on: ubuntu-24.04
-    needs: checkout  
+    needs: checkout
     steps:
       - name: Download Repository Artifact
         uses: actions/download-artifact@v4
@@ -71,14 +71,14 @@ jobs:
         run: |
           cd ./repository/DVWA
           git init
-          docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json || echo '{"secrets": []}' > trufflehog-results.json
-
+          docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest --directory /src --json > trufflehog-results.json || echo '{"secrets": []}' > trufflehog-results.json
 
       - name: Upload Secrets Scan Report
         uses: actions/upload-artifact@v4
         with:
           name: pre-flight-security-secrets
           path: ./repository/DVWA/trufflehog-results.json
+
 
   security_gate_pre_flight:
     name: Security Gate Pre-Flight
