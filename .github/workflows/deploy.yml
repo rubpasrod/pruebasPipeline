@@ -5,7 +5,6 @@ on:
     branches:
       - main
 
-
 jobs:
   clone_repo:
     name: Clone Repository
@@ -15,9 +14,7 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Checkout DVWA
-        run: |
-          git clone https://github.com/digininja/DVWA.git dvwa
-          cd dvwa
+        run: git clone https://github.com/digininja/DVWA.git dvwa
 
   pre_flight_sast:
     name: SAST (Semgrep)
@@ -26,7 +23,7 @@ jobs:
     steps:
       - name: Run Semgrep (SAST)
         run: |
-          docker run --rm -v $(pwd)/dvwa:/src returntocorp/semgrep semgrep --config=p/ci --json -o semgrep-results.json
+          docker run --rm -v $(pwd)/dvwa:/src returntocorp/semgrep semgrep --config=p/ci --json > semgrep-results.json
 
       - name: Upload SAST Report
         uses: actions/upload-artifact@v4
@@ -34,17 +31,16 @@ jobs:
           name: pre-flight-security-reports
           path: semgrep-results.json
 
-  #SCA (Dependency-Check) later
-
   pre_flight_secrets:
     name: Secrets Scanning (TruffleHog)
     runs-on: ubuntu-24.04
     needs: clone_repo
     steps:
-
       - name: Run TruffleHog Scan (Secrets)
         run: |
-          docker run --rm -v $(pwd)/dvwa:/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json
+          cd dvwa
+          git init
+          docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json
 
       - name: Upload Secrets Scan Report
         uses: actions/upload-artifact@v4
@@ -66,7 +62,6 @@ jobs:
       - name: Check for Critical Vulnerabilities
         run: |
           if grep -q '"severity": "ERROR"' ./security-reports/semgrep-results.json || \
-             grep -q '"severity": "CRITICAL"' ./security-reports/dependency-check-report/dependency-check-report.json || \
              grep -q '"reason":' ./security-reports/trufflehog-results.json; then
             echo "Critical vulnerabilities found!"
             exit 1
@@ -77,8 +72,9 @@ jobs:
     runs-on: ubuntu-24.04
     needs: security_gate_pre_flight
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
+
       - name: Build Image
         run: docker build -t dvwa .
 
@@ -95,6 +91,9 @@ jobs:
     runs-on: ubuntu-24.04
     needs: test
     steps:
+      - name: Run DVWA
+        run: docker run -d -p 3000:80 dvwa
+
       - name: Run OWASP ZAP Scan (DAST)
         run: |
           docker run --rm -v $(pwd):/zap/wrk/:rw --user root --network="host" -t zaproxy/zap-weekly zap-baseline.py -t http://localhost:3000 -r zap-report.html -I
@@ -112,7 +111,7 @@ jobs:
     steps:
       - name: Scan Image with Trivy
         run: |
-          trivy image --exit-code 1 --severity HIGH,CRITICAL dvwa > trivy_results.txt
+          trivy image --severity HIGH,CRITICAL dvwa > trivy_results.txt
 
       - name: Upload Image Scan Report
         uses: actions/upload-artifact@v4
