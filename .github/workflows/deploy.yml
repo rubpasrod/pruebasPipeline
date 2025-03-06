@@ -71,7 +71,8 @@ jobs:
         run: |
           cd ./repository/DVWA
           git init
-          docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json || echo "No secrets found" > trufflehog-results.json
+          docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json || echo '{"secrets": []}' > trufflehog-results.json
+
 
       - name: Upload Secrets Scan Report
         uses: actions/upload-artifact@v4
