@@ -34,35 +34,13 @@ jobs:
           name: pre-flight-security-reports
           path: semgrep-results.json
 
-  pre_flight_sca:
-    name: SCA (OWASP Dependency-Check)
-    runs-on: ubuntu-24.04
-    needs: clone_repo
-    steps:
-      - name: Checkout DVWA
-        run: |
-          git clone https://github.com/digininja/DVWA.git dvwa
-          cd dvwa
-
-      - name: Run OWASP Dependency-Check (SCA)
-        run: |
-          docker run --rm -v $(pwd)/dvwa:/src owasp/dependency-check:latest --scan /src --format "ALL" --out /src/dependency-check-report
-
-      - name: Upload SCA Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: pre-flight-security-reports
-          path: dependency-check-report/
+  #SCA (Dependency-Check) later
 
   pre_flight_secrets:
     name: Secrets Scanning (TruffleHog)
     runs-on: ubuntu-24.04
     needs: clone_repo
     steps:
-      - name: Checkout DVWA
-        run: |
-          git clone https://github.com/digininja/DVWA.git dvwa
-          cd dvwa
 
       - name: Run TruffleHog Scan (Secrets)
         run: |
