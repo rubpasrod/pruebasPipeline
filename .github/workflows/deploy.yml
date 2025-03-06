@@ -25,7 +25,6 @@ jobs:
   pre_flight_secrets:
     name: Secrets Scanning (TruffleHog)
     runs-on: ubuntu-24.04
-    needs: clone_repo
     steps:
       - name: Show Current Directory
         run: |
