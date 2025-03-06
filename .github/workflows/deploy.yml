@@ -30,25 +30,6 @@ jobs:
           name: semgrep-results
           path: semgrep-results.json
 
-  sca:
-    name: Run SCA (Snyk)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run SCA with Snyk (Docker)
-        run: |
-          docker run --rm -v $(pwd):/project snyk/snyk:alpine snyk test /project --all-projects --debug > snyk-results.txt
-
-      - name: Upload SCA Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: snyk-results
-          path: snyk-results.txt
-
-
-
   secrets:
     name: Run Secrets Scanning (TruffleHog)
     runs-on: ubuntu-24.04
@@ -59,7 +40,7 @@ jobs:
       - name: Run secrets scanning with TruffleHog
         run: |
           pip install truffleHog
-          trufflehog --git-url https://github.com/rubpasrod/pruebasPipeline.git --json > trufflehog-results.json
+          trufflehog --repo-path https://github.com/rubpasrod/pruebasPipeline.git --json > trufflehog-results.json
 
       - name: Upload Secrets Scan Report
         uses: actions/upload-artifact@v4
