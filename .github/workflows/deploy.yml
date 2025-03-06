@@ -35,14 +35,14 @@ jobs:
 
       - name: Run Semgrep (SAST)
         run: |
-          cd ./repository/DVWA
+          cd ./repository
           docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep --json > ./semgrep-results.json
           
       - name: Verify Semgrep Results
         run: |
           echo "Listing files in current directory:"
-          ls -alh ./repository/DVWA
-          if [ ! -f ./repository/DVWA/semgrep-results.json ]; then
+          ls -alh ./repository
+          if [ ! -f ./repository/semgrep-results.json ]; then
             echo "Semgrep results file not found!"
             exit 1
           else
@@ -53,8 +53,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pre-flight-security-sast
-          path: ./repository/DVWA/semgrep-results.json
-
+          path: ./repository/semgrep-results.json
 
   pre_flight_secrets:
     name: Secrets Scanning (TruffleHog)
@@ -67,11 +66,9 @@ jobs:
           name: repository-artifact
           path: ./repository
 
-
-
       - name: Run TruffleHog Scan
         run: |
-          cd ./repository/DVWA  # Cambiar al directorio donde se encuentra el código
+          cd ./repository  # Cambiar al directorio donde se encuentra el código
           docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest \
             git file:///src --json > trufflehog-results.json || echo '{"secrets": []}' > trufflehog-results.json
           # Asegurarse de que el archivo se haya creado, incluso si no se encuentran secretos
@@ -81,13 +78,11 @@ jobs:
           # Comprobar el archivo de resultados
           cat trufflehog-results.json
 
-
-
       - name: Upload Secrets Scan Report
         uses: actions/upload-artifact@v4
         with:
           name: pre-flight-security-secrets
-          path: ./repository/DVWA/trufflehog-results.json
+          path: ./repository/trufflehog-results.json
 
   security_gate_pre_flight:
     name: Security Gate Pre-Flight
