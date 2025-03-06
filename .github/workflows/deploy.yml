@@ -1,0 +1,158 @@
+name: DVWA Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+
+jobs:
+  clone_repo:
+    name: Clone Repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: Checkout DVWA
+        run: |
+          git clone https://github.com/digininja/DVWA.git dvwa
+          cd dvwa
+
+  pre_flight_sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Run Semgrep (SAST)
+        run: |
+          docker run --rm -v $(pwd)/dvwa:/src returntocorp/semgrep semgrep --config=p/ci --json -o semgrep-results.json
+
+      - name: Upload SAST Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-flight-security-reports
+          path: semgrep-results.json
+
+  pre_flight_sca:
+    name: SCA (OWASP Dependency-Check)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout DVWA
+        run: |
+          git clone https://github.com/digininja/DVWA.git dvwa
+          cd dvwa
+
+      - name: Run OWASP Dependency-Check (SCA)
+        run: |
+          docker run --rm -v $(pwd)/dvwa:/src owasp/dependency-check:latest --scan /src --format "ALL" --out /src/dependency-check-report
+
+      - name: Upload SCA Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-flight-security-reports
+          path: dependency-check-report/
+
+  pre_flight_secrets:
+    name: Secrets Scanning (TruffleHog)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout DVWA
+        run: |
+          git clone https://github.com/digininja/DVWA.git dvwa
+          cd dvwa
+
+      - name: Run TruffleHog Scan (Secrets)
+        run: |
+          docker run --rm -v $(pwd)/dvwa:/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json
+
+      - name: Upload Secrets Scan Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-flight-security-reports
+          path: trufflehog-results.json
+
+  security_gate_pre_flight:
+    name: Security Gate Pre-Flight
+    runs-on: ubuntu-24.04
+    needs: [pre_flight_sast, pre_flight_sca, pre_flight_secrets]
+    steps:
+      - name: Download Pre-Flight Security Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: pre-flight-security-reports
+          path: ./security-reports
+
+      - name: Check for Critical Vulnerabilities
+        run: |
+          if grep -q '"severity": "ERROR"' ./security-reports/semgrep-results.json || \
+             grep -q '"severity": "CRITICAL"' ./security-reports/dependency-check-report/dependency-check-report.json || \
+             grep -q '"reason":' ./security-reports/trufflehog-results.json; then
+            echo "Critical vulnerabilities found!"
+            exit 1
+          fi
+
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    needs: security_gate_pre_flight
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build Image
+        run: docker build -t dvwa .
+
+  test:
+    name: Test
+    runs-on: ubuntu-24.04
+    needs: build
+    steps:
+      - name: Run Unit & Integration Tests
+        run: echo "Running tests..." # Reemplazar con pruebas reales
+
+  pre_deployment_dast:
+    name: DAST (OWASP ZAP)
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - name: Run OWASP ZAP Scan (DAST)
+        run: |
+          docker run --rm -v $(pwd):/zap/wrk/:rw --user root --network="host" -t zaproxy/zap-weekly zap-baseline.py -t http://localhost:3000 -r zap-report.html -I
+
+      - name: Upload DAST Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-deployment-security-reports
+          path: zap-report.html
+
+  pre_deployment_image_scan:
+    name: Image Scanning (Trivy)
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - name: Scan Image with Trivy
+        run: |
+          trivy image --exit-code 1 --severity HIGH,CRITICAL dvwa > trivy_results.txt
+
+      - name: Upload Image Scan Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-deployment-security-reports
+          path: trivy_results.txt
+
+  security_gate_pre_deployment:
+    name: Security Gate Pre-Deployment
+    runs-on: ubuntu-24.04
+    needs: [pre_deployment_dast, pre_deployment_image_scan]
+    steps:
+      - name: Download Pre-Deployment Security Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: pre-deployment-security-reports
+          path: ./security-reports
+
+      - name: Check for Critical Vulnerabilities
+        run: |
+          if grep -q '"severity": "CRITICAL"' ./security-reports/trivy_results.txt; then
+            echo "Critical vulnerabilities found!"
+            exit 1
+          fi
