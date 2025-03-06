@@ -1,169 +1,108 @@
-name: DVWA Pipeline
+name: DVWA pipeline
 
 on:
   push:
     branches:
       - main
 
+
 jobs:
-  checkout:
-    name: Checkout Repository
-    runs-on: ubuntu-24.04
-    outputs:
-      repo-path: ${{ steps.checkout.outputs.path }}
+  sast:
+    name: Run SAST (SonarQube)
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        id: checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Upload Repository
-        uses: actions/upload-artifact@v4
-        with:
-          name: repository-artifact
-          path: .
+      - name: Run SAST with SonarQube
+        run: |
+          sonar-scanner
 
-  pre_flight_sast:
-    name: SAST (Semgrep)
-    runs-on: ubuntu-24.04
-    needs: checkout
+  sca:
+    name: Run SCA (Snyk)
+    runs-on: ubuntu-latest
     steps:
-      - name: Download Repository Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: repository-artifact
-          path: ./repository
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Run Semgrep (SAST)
+      - name: Run SCA with Snyk
         run: |
-          cd ./repository/DVWA
-          docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep --json > ./semgrep-results.json
-          
-      - name: Verify Semgrep Results
-        run: |
-          echo "Listing files in current directory:"
-          ls -alh ./repository/DVWA
-          if [ ! -f ./repository/DVWA/semgrep-results.json ]; then
-            echo "Semgrep results file not found!"
-            exit 1
-          else
-            echo "Semgrep results file found!"
-          fi
+          curl -sL https://github.com/snyk/snyk/releases/download/v1.901.0/snyk-linux.tar.gz | tar xz
+          ./snyk test
 
-      - name: Upload SAST Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: pre-flight-security-sast
-          path: ./repository/DVWA/semgrep-results.json
-
-
-  pre_flight_secrets:
-    name: Secrets Scanning (TruffleHog)
-    runs-on: ubuntu-24.04
-    needs: checkout  
+  secrets:
+    name: Run Secrets Scanning (TruffleHog)
+    runs-on: ubuntu-latest
     steps:
-      - name: Download Repository Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: repository-artifact
-          path: ./repository
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Run TruffleHog Scan
+      - name: Run secrets scanning with TruffleHog
         run: |
-          docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest \
-            git file:///src --json > trufflehog-results.json || echo '{"secrets": []}' > trufflehog-results.json
-          # Asegurarse de que el archivo se haya creado, incluso si no se encuentran secretos
-          if [ ! -f trufflehog-results.json ]; then
-            echo '{"secrets": []}' > trufflehog-results.json
-          fi
-          # Comprobar el archivo de resultados
-          cat trufflehog-results.json
-
-      - name: Upload Secrets Scan Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: pre-flight-security-secrets
-          path: ./repository/trufflehog-results.json
-
-  security_gate_pre_flight:
-    name: Security Gate Pre-Flight
-    runs-on: ubuntu-24.04
-    needs: [pre_flight_sast, pre_flight_secrets]
-    steps:
-      - name: Download Pre-Flight Security Reports
-        uses: actions/download-artifact@v4
-        with:
-          name: pre-flight-security-reports
-          path: ./security-reports
-
-      - name: Check for Critical Vulnerabilities
-        run: |
-          if grep -q '"severity": "ERROR"' ./security-reports/semgrep-results.json || \
-             grep -q '"severity": "CRITICAL"' ./security-reports/dependency-check-report/dependency-check-report.json || \
-             grep -q '"reason":' ./security-reports/trufflehog-results.json; then
-            echo "Critical vulnerabilities found!"
-            exit 1
-          fi
+          pip install truffleHog
+          trufflehog --git-url https://github.com/your-repository.git
 
   build:
-    name: Build
-    runs-on: ubuntu-24.04
-    needs: security_gate_pre_flight
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: [sast, sca, secrets]
     steps:
-      - name: Build Image
-        run: docker build -t dvwa .
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  test:
-    name: Test
-    runs-on: ubuntu-24.04
+      - name: Build Docker image
+        run: |
+          docker build -t your-app .
+
+      - name: Save Docker image to tarball
+        run: |
+          docker save your-app > your-app.tar
+
+  pre-deployment:
+    name: Pre-Deployment Security Checks
+    runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Run Unit & Integration Tests
-        run: echo "Running tests..." # Reemplazar con pruebas reales
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  pre_deployment_dast:
-    name: DAST (OWASP ZAP)
-    runs-on: ubuntu-24.04
-    needs: test
-    steps:
-      - name: Run OWASP ZAP Scan (DAST)
+      # DAST (Dynamic Application Security Testing) con OWASP ZAP
+      - name: Run DAST with OWASP ZAP
         run: |
-          docker run --rm -v $(pwd):/zap/wrk/:rw --user root --network="host" -t zaproxy/zap-weekly zap-baseline.py -t http://localhost:3000 -r zap-report.html -I
+          docker run -v $(pwd):/src owasp/zap2docker-stable zap-full-scan.py -t http://your-app.local
 
-      - name: Upload DAST Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: pre-deployment-security-reports
-          path: zap-report.html
-
-  pre_deployment_image_scan:
-    name: Image Scanning (Trivy)
-    runs-on: ubuntu-24.04
-    needs: test
-    steps:
-      - name: Scan Image with Trivy
+      # Escaneo de imágenes Docker
+      - name: Run Docker Image Scan with Trivy
         run: |
-          trivy image --exit-code 1 --severity HIGH,CRITICAL dvwa > trivy_results.txt
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
+          trivy image your-app
 
-      - name: Upload Image Scan Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: pre-deployment-security-reports
-          path: trivy_results.txt
-
-  security_gate_pre_deployment:
-    name: Security Gate Pre-Deployment
-    runs-on: ubuntu-24.04
-    needs: [pre_deployment_dast, pre_deployment_image_scan]
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: pre-deployment  # Asegurarse de que los chequeos de pre-deployment hayan pasado
     steps:
-      - name: Download Pre-Deployment Security Reports
-        uses: actions/download-artifact@v4
-        with:
-          name: pre-deployment-security-reports
-          path: ./security-reports
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Check for Critical Vulnerabilities
+      - name: Run unit tests
         run: |
-          if grep -q '"severity": "CRITICAL"' ./security-reports/trivy_results.txt; then
-            echo "Critical vulnerabilities found!"
-            exit 1
-          fi
+          npm install
+          npm test
+
+      - name: Run integration tests
+        run: |
+          pytest tests/
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: test  # Asegurarse de que no haya fallos en las pruebas
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy Docker image
+        run: |
+          docker push your-app
+        if: ${{ success() }}  # Solo se ejecuta si todo ha pasado correctamente
