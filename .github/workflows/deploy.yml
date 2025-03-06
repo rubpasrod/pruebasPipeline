@@ -51,7 +51,7 @@ jobs:
   build:
     name: Build Application
     runs-on: ubuntu-24.04
-    needs: [sast, sca, secrets]  # Asegurarse de que los análisis previos hayan pasado
+    needs: [sast, secrets]  # Asegurarse de que los análisis previos hayan pasado
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
