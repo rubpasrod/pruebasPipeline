@@ -6,45 +6,76 @@ on:
       - main
 
 jobs:
+  checkout:
+    name: Checkout Repository
+    runs-on: ubuntu-24.04
+    outputs:
+      repo-path: ${{ steps.checkout.outputs.path }}
+    steps:
+      - name: Checkout Repository
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Asegura que todo el historial del repositorio se clone
+          
+      - name: Upload Repository
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-artifact
+          path: .
+
   pre_flight_sast:
     name: SAST (Semgrep)
     runs-on: ubuntu-24.04
+    needs: checkout  # Este job depende del job "checkout"
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - name: Download Repository Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: repository-artifact
+          path: ./repository
 
       - name: Run Semgrep (SAST)
         run: |
-          docker run --rm -v $(pwd)/DVWA:/src returntocorp/semgrep semgrep --json > semgrep-results.json
+          cd ./repository/DVWA
+          docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep --json > semgrep-results.json
+
       - name: Upload SAST Report
         uses: actions/upload-artifact@v4
         with:
           name: pre-flight-security-reports
-          path: semgrep-results.json
+          path: ./repository/semgrep-results.json
 
   pre_flight_secrets:
     name: Secrets Scanning (TruffleHog)
     runs-on: ubuntu-24.04
+    needs: checkout  # Este job también depende del job "checkout"
     steps:
+      - name: Download Repository Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: repository-artifact
+          path: ./repository
+
       - name: Show Current Directory
         run: |
           echo "Current directory:"
           pwd
           echo "Listing files in the current directory:"
-          ls -alh  # Asegúrate de ver si el directorio DVWA está listado aquí
+          ls -alh
 
       - name: Verify DVWA Directory Exists
         run: |
-          if [ -d "DVWA" ]; then
+          if [ -d "./repository/DVWA" ]; then
             echo "DVWA directory exists!"
           else
             echo "DVWA directory does not exist."
-            exit 1  # Detener el pipeline si el directorio DVWA no existe
+            exit 1
           fi
 
       - name: Run TruffleHog Scan (Secrets)
         run: |
-          cd DVWA  # Cambiar al directorio DVWA si existe
+          cd ./repository/DVWA
           git init  # Inicializar el repositorio git dentro de DVWA
           docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json || echo "No secrets found" > trufflehog-results.json
 
@@ -52,7 +83,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pre-flight-security-reports
-          path: DVWA/trufflehog-results.json
+          path: ./repository/DVWA/trufflehog-results.json
 
   security_gate_pre_flight:
     name: Security Gate Pre-Flight
@@ -79,8 +110,6 @@ jobs:
     runs-on: ubuntu-24.04
     needs: security_gate_pre_flight
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
       - name: Build Image
         run: docker build -t dvwa .
 
