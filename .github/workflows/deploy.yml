@@ -15,8 +15,6 @@ jobs:
       - name: Checkout Repository
         id: checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Asegura que todo el historial del repositorio se clone
           
       - name: Upload Repository
         uses: actions/upload-artifact@v4
@@ -38,18 +36,30 @@ jobs:
       - name: Run Semgrep (SAST)
         run: |
           cd ./repository/DVWA
-          docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep --json > semgrep-results.json
+          docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep --json > ./semgrep-results.json
+          
+      - name: Verify Semgrep Results
+        run: |
+          echo "Listing files in current directory:"
+          ls -alh ./repository/DVWA
+          if [ ! -f ./repository/DVWA/semgrep-results.json ]; then
+            echo "Semgrep results file not found!"
+            exit 1
+          else
+            echo "Semgrep results file found!"
+          fi
 
       - name: Upload SAST Report
         uses: actions/upload-artifact@v4
         with:
           name: pre-flight-security-reports
-          path: ./repository/semgrep-results.json
+          path: ./repository/DVWA/semgrep-results.json
+
 
   pre_flight_secrets:
     name: Secrets Scanning (TruffleHog)
     runs-on: ubuntu-24.04
-    needs: checkout  # Este job también depende del job "checkout"
+    needs: checkout  
     steps:
       - name: Download Repository Artifact
         uses: actions/download-artifact@v4
@@ -57,26 +67,10 @@ jobs:
           name: repository-artifact
           path: ./repository
 
-      - name: Show Current Directory
-        run: |
-          echo "Current directory:"
-          pwd
-          echo "Listing files in the current directory:"
-          ls -alh
-
-      - name: Verify DVWA Directory Exists
-        run: |
-          if [ -d "./repository/DVWA" ]; then
-            echo "DVWA directory exists!"
-          else
-            echo "DVWA directory does not exist."
-            exit 1
-          fi
-
       - name: Run TruffleHog Scan (Secrets)
         run: |
           cd ./repository/DVWA
-          git init  # Inicializar el repositorio git dentro de DVWA
+          git init
           docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest git file:///src --json > trufflehog-results.json || echo "No secrets found" > trufflehog-results.json
 
       - name: Upload Secrets Scan Report
