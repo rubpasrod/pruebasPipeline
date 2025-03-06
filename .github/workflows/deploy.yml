@@ -26,7 +26,6 @@ jobs:
   pre_flight_secrets:
     name: Secrets Scanning (TruffleHog)
     runs-on: ubuntu-24.04
-    needs: pre_flight_sast
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
