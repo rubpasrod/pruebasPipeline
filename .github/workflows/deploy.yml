@@ -59,7 +59,7 @@ jobs:
   pre_flight_secrets:
     name: Secrets Scanning (TruffleHog)
     runs-on: ubuntu-24.04
-    needs: checkout
+    needs: checkout  
     steps:
       - name: Download Repository Artifact
         uses: actions/download-artifact@v4
@@ -67,18 +67,16 @@ jobs:
           name: repository-artifact
           path: ./repository
 
-      - name: Run TruffleHog Scan (Secrets)
+      - name: Run TruffleHog Scan
         run: |
-          cd ./repository/DVWA
-          git init
-          docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest --directory /src --json > trufflehog-results.json || echo '{"secrets": []}' > trufflehog-results.json
-
+          docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest \
+          git file:///src --json > trufflehog-results.json
+          
       - name: Upload Secrets Scan Report
         uses: actions/upload-artifact@v4
         with:
           name: pre-flight-security-secrets
           path: ./repository/DVWA/trufflehog-results.json
-
 
   security_gate_pre_flight:
     name: Security Gate Pre-Flight
