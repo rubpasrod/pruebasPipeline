@@ -52,7 +52,7 @@ jobs:
       - name: Upload SAST Report
         uses: actions/upload-artifact@v4
         with:
-          name: pre-flight-security-reports
+          name: pre-flight-security-sast
           path: ./repository/DVWA/semgrep-results.json
 
 
@@ -76,7 +76,7 @@ jobs:
       - name: Upload Secrets Scan Report
         uses: actions/upload-artifact@v4
         with:
-          name: pre-flight-security-reports
+          name: pre-flight-security-secrets
           path: ./repository/DVWA/trufflehog-results.json
 
   security_gate_pre_flight:
