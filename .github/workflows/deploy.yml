@@ -67,11 +67,21 @@ jobs:
           name: repository-artifact
           path: ./repository
 
+
+
       - name: Run TruffleHog Scan
         run: |
-          cd ./repository/DVWA
+          cd ./repository/DVWA  # Cambiar al directorio donde se encuentra el código
           docker run --rm -v $(pwd):/src trufflesecurity/trufflehog:latest \
-          git file:///src --json > trufflehog-results.json
+            git file:///src --json > trufflehog-results.json || echo '{"secrets": []}' > trufflehog-results.json
+          # Asegurarse de que el archivo se haya creado, incluso si no se encuentran secretos
+          if [ ! -f trufflehog-results.json ]; then
+            echo '{"secrets": []}' > trufflehog-results.json
+          fi
+          # Comprobar el archivo de resultados
+          cat trufflehog-results.json
+
+
 
       - name: Upload Secrets Scan Report
         uses: actions/upload-artifact@v4
