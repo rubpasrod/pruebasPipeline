@@ -37,16 +37,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run SCA with Snyk
+      - name: Run SCA with Snyk (Docker)
         run: |
-          curl -sL https://github.com/snyk/snyk/releases/download/v1.901.0/snyk-linux.tar.gz | tar xz
-          ./snyk test  # Ejecutar análisis de dependencias
+          docker run --rm -v $(pwd):/project snyk/snyk:latest test /project --json > snyk-results.json
 
-      - name: Upload SCA Report
+      - name: Upload SCA Results
         uses: actions/upload-artifact@v4
         with:
           name: snyk-results
           path: snyk-results.json
+
 
   secrets:
     name: Run Secrets Scanning (TruffleHog)
