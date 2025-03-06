@@ -32,9 +32,9 @@ jobs:
 
   sca:
     name: Run SCA (Snyk)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run SCA with Snyk (Docker)
@@ -46,6 +46,7 @@ jobs:
         with:
           name: snyk-results
           path: snyk-results.json
+
 
 
   secrets:
