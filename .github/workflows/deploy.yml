@@ -104,8 +104,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y python3-pip curl jq  # Instalar pip, curl y jq
-          pip install pytest  # Instalar pytest manualmente
+          sudo apt install -y python3-pip curl jq
+          pip install pytest requests
 
       - name: Run URL Tests
         run: |
