@@ -88,34 +88,29 @@ jobs:
           path: /tmp/dvwa-image/
 
 
-  test:
-    name: Run Tests
-    runs-on: ubuntu-24.04
-    needs: build
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+test:
+  name: Run DVWA Tests
+  runs-on: ubuntu-24.04
+  needs: build
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.1' 
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
 
-      - name: Install dependencies
-        run: |
-          cd /home/runner/work/pruebasPipeline/pruebasPipeline/vulnerabilities/api
-          composer update
-          composer install
-          composer fund
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y curl jq 
+        pip install -r requirements.txt || true
 
-      - name: Run PHP Unit Tests
-        run: |
-          composer require --dev phpunit/phpunit
-          vendor/bin/phpunit --configuration phpunit.xml
+    - name: Run Security Tests
+      run: |
+        pytest tests/
 
-      - name: Run Integration Tests
-        run: |
-          pytest tests/
 
 
   pre-deployment-dast:
