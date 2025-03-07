@@ -77,9 +77,18 @@ jobs:
       - name: Build Image
         if: steps.cache-docker.outputs.cache-hit != 'true'
         run: |
-          docker build -t dvwa .
-          mkdir -p /tmp/dvwa-image
-          docker save dvwa > /tmp/dvwa-image/dvwa.tar
+          docker build -t dvwa .  # Construir la imagen DVWA
+          mkdir -p /tmp/dvwa-image  # Crear el directorio si no existe
+          docker save dvwa > /tmp/dvwa-image/dvwa.tar  # Guardar la imagen como archivo .tar
+
+      - name: Verify dvwa.tar exists
+        run: |
+          if [ -f /tmp/dvwa-image/dvwa.tar ]; then
+            echo "File exists"
+          else
+            echo "File does not exist"
+            exit 1
+          fi
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -122,19 +131,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Instalar dependencias
       - name: 📦 Install dependencies
         run: sudo apt update && sudo apt install -y curl
 
+      # Cargar la imagen de DVWA
       - name: 🔧 Start DVWA from Build Image
         run: |
           docker load -i /tmp/dvwa-image/dvwa.tar  # Cargar la imagen DVWA construida en el paso de build
           docker run --name dvwa -d -p 80:80 dvwa  # Iniciar la imagen DVWA
-          sleep 20  # Esperar para que DVWA inicie correctamente
+          sleep 60  # Esperar para que DVWA inicie correctamente
 
+      # Verificar si DVWA está en ejecución
       - name: 🔍 Check if DVWA is running
         run: |
           curl --retry 5 --retry-delay 10 --retry-connrefused -I http://localhost
 
+      # Ejecutar OWASP ZAP para realizar el escaneo DAST
       - name: Run OWASP ZAP Scan (DAST)
         run: |
           docker ps  # Verificar los contenedores en ejecución
@@ -142,6 +155,7 @@ jobs:
           docker run --rm -v $(pwd):/zap/wrk/:rw --user root --network="host" -t zaproxy/zap-weekly \
           zap-baseline.py -t http://localhost -g /zap/wrk/gen.conf -r zap-report.html -I
 
+      # Subir el informe DAST generado
       - name: Upload DAST Report
         uses: actions/upload-artifact@v4
         with:
