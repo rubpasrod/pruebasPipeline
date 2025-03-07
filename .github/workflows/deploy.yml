@@ -104,6 +104,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd /home/runner/work/pruebasPipeline/pruebasPipeline/vulnerabilities/api
+          composer update
           composer install
 
       - name: Run PHP Unit Tests
