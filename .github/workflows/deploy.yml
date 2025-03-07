@@ -91,7 +91,7 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-24.04
-    needs: test
+    needs: build
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
