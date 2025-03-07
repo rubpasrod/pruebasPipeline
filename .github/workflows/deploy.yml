@@ -135,6 +135,23 @@ jobs:
       - name: 📦 Install dependencies
         run: sudo apt update && sudo apt install -y curl
 
+      # Descargar el artifact (la imagen DVWA)
+      - name: Download DVWA Image Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dvwa-image
+          path: /tmp/dvwa-image
+
+      # Verificar que el archivo dvwa.tar existe después de descargarlo
+      - name: Verify dvwa.tar exists
+        run: |
+          if [ -f /tmp/dvwa-image/dvwa.tar ]; then
+            echo "File exists"
+          else
+            echo "File does not exist"
+            exit 1
+          fi
+
       # Cargar la imagen de DVWA
       - name: 🔧 Start DVWA from Build Image
         run: |
