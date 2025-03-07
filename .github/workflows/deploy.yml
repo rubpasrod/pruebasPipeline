@@ -109,7 +109,7 @@ jobs:
 
       - name: Run URL Tests
         run: |
-          cd /home/runner/work/pruebasPipeline/pruebasPipeline/tests  # Ir a la carpeta de tests
+          cd /home/runner/work/pruebasPipeline/pruebasPipeline/tests
           python3 -m pytest -s test_url.py || echo "Algunas pruebas fallaron, revisa los logs"
 
 
@@ -149,16 +149,42 @@ jobs:
 
 
   pre-deployment-image-scan:
-    name: Image Scanning (Trivy)
+    name: Pre-deployment Image Scan
     runs-on: ubuntu-24.04
-    needs: test
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run Trivy Image Scan
+      # Instalar Trivy
+      - name: Install Trivy
         run: |
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/src aquasec/trivy your-app.tar
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -cs) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      # Escaneo de la imagen de DVWA con Trivy
+      - name: Scan DVWA with Trivy
+        run: |
+          echo "🔍 Escaneando la imagen DVWA con Trivy..."
+          trivy image --exit-code 0 --severity HIGH,CRITICAL vulnerables/web-dvwa | tee trivy_results_web-dvwa.txt
+        continue-on-error: true 
+
+      # Escaneo de la imagen de MySQL con Trivy
+      - name: Scan MySQL with Trivy
+        run: |
+          echo "🔍 Escaneando la imagen MySQL con Trivy..."
+          trivy image --exit-code 0 --severity HIGH,CRITICAL mysql:5.7 | tee trivy_results_mysql.txt
+        continue-on-error: true 
+
+      # Subir los resultados de Trivy como artefactos
+      - name: Upload Trivy Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-reports
+          path: trivy_results_*.txt
+
+
+
 
   deploy:
     name: Deploy to Production
