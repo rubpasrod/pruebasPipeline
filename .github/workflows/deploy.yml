@@ -115,7 +115,7 @@ jobs:
 
 
   pre-deployment-dast:
-    name: DAST (OWASP ZAP)
+    name: DAST (OWASP ZAP) for DVWA
     runs-on: ubuntu-24.04
     needs: test
     steps:
@@ -123,24 +123,25 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 📦 Install dependencies
-        run: npm install --legacy-peer-deps
+        run: sudo apt update && sudo apt install -y curl
 
-      - name: 🔧 Create missing file
-        run: mkdir -p .well-known/csaf && touch .well-known/csaf/provider-metadata.json
+      - name: 🔧 Start DVWA from Build Image
+        run: |
+          docker load -i /tmp/dvwa-image/dvwa.tar  # Cargar la imagen DVWA construida en el paso de build
+          docker run --name dvwa -d -p 80:80 dvwa  # Iniciar la imagen DVWA
+          sleep 20  # Esperar para que DVWA inicie correctamente
 
-      - name: 🔧 Start Juice Shop
+      - name: 🔍 Check if DVWA is running
         run: |
-          nohup npm start &
-          sleep 60
-      - name: 🔍 Check if Juice Shop is running
-        run: |
-          curl --retry 5 --retry-delay 10 --retry-connrefused -I http://localhost:3000
+          curl --retry 5 --retry-delay 10 --retry-connrefused -I http://localhost
+
       - name: Run OWASP ZAP Scan (DAST)
         run: |
-          docker ps
-          docker pull zaproxy/zap-weekly
+          docker ps  # Verificar los contenedores en ejecución
+          docker pull zaproxy/zap-weekly  # Descargar la última imagen de ZAP
           docker run --rm -v $(pwd):/zap/wrk/:rw --user root --network="host" -t zaproxy/zap-weekly \
-          zap-baseline.py -t http://localhost:3000 -g /zap/wrk/gen.conf -r zap-report.html -I
+          zap-baseline.py -t http://localhost -g /zap/wrk/gen.conf -r zap-report.html -I
+
       - name: Upload DAST Report
         uses: actions/upload-artifact@v4
         with:
@@ -148,11 +149,12 @@ jobs:
           path: zap-report.html
 
 
+
   pre-deployment-image-scan:
-    name: Pre-deployment Image Scan
+    name: Run Trivy (Image Scan)
     runs-on: ubuntu-24.04
+    needs: test
     steps:
-      # Instalar Trivy
       - name: Install Trivy
         run: |
           sudo apt-get update
@@ -162,29 +164,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y trivy
 
-      # Escaneo de la imagen de DVWA con Trivy
       - name: Scan DVWA with Trivy
         run: |
           echo "🔍 Escaneando la imagen DVWA con Trivy..."
           trivy image --exit-code 0 --severity HIGH,CRITICAL vulnerables/web-dvwa | tee trivy_results_web-dvwa.txt
         continue-on-error: true 
 
-      # Escaneo de la imagen de MySQL con Trivy
       - name: Scan MySQL with Trivy
         run: |
           echo "🔍 Escaneando la imagen MySQL con Trivy..."
           trivy image --exit-code 0 --severity HIGH,CRITICAL mysql:5.7 | tee trivy_results_mysql.txt
         continue-on-error: true 
 
-      # Subir los resultados de Trivy como artefactos
       - name: Upload Trivy Reports
         uses: actions/upload-artifact@v4
         with:
           name: trivy-reports
           path: trivy_results_*.txt
-
-
-
 
   deploy:
     name: Deploy to Production
@@ -196,4 +192,4 @@ jobs:
 
       - name: Deploy Docker image
         run: |
-          echo "Desplegue"
+          echo "Despliegue"
