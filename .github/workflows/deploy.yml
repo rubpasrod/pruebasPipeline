@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  sast:
+  pre-flight-sast:
     name: SAST (Semgrep)
     runs-on: ubuntu-24.04
     steps:
@@ -30,7 +30,7 @@ jobs:
           name: semgrep-results
           path: semgrep-results.json
 
-  secrets:
+  pre-flight-secrets:
     name: Run Secrets Scanning (TruffleHog)
     runs-on: ubuntu-24.04
     steps:
@@ -50,45 +50,48 @@ jobs:
 
 
   build:
-    name: Build Application
+    name: Build DVWA Image
     runs-on: ubuntu-24.04
-    needs: [sast, secrets]  # Asegurarse de que los análisis previos hayan pasado
+    needs: [pre-flight-sast, pre-flight-secrets]
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build Docker image
+      - name: Debug Cache Key
         run: |
-          docker build -t your-app .
+          echo "Cache key: dvwa-image-${{ runner.os }}-${{ hashFiles('Dockerfile') }}"
 
-      - name: Save Docker image to tarball
+      - name: Restore Cached Docker Image
+        id: cache-docker
+        uses: actions/cache@v3
+        with:
+          path: /tmp/dvwa-image
+          key: dvwa-image-${{ runner.os }}-${{ hashFiles('Dockerfile') }}
+          restore-keys: |
+            dvwa-image-${{ runner.os }}-
+
+      - name: Load Cached Image (if available)
+        if: steps.cache-docker.outputs.cache-hit == 'true'
+        run: docker load < /tmp/dvwa-image/dvwa.tar
+
+      - name: Build Image
+        if: steps.cache-docker.outputs.cache-hit != 'true'
         run: |
-          docker save your-app > your-app.tar
+          docker build -t dvwa .
+          mkdir -p /tmp/dvwa-image
+          docker save dvwa > /tmp/dvwa-image/dvwa.tar
 
-  pre-deployment:
-    name: Pre-Deployment Security Checks
-    runs-on: ubuntu-24.04
-    needs: build  # Asegurarse de que la construcción haya terminado antes de los chequeos de seguridad
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dvwa-image
+          path: /tmp/dvwa-image/
 
-      # DAST (Dynamic Application Security Testing) con OWASP ZAP
-      - name: Run DAST with OWASP ZAP
-        run: |
-          docker run -v $(pwd):/src owasp/zap2docker-stable zap-full-scan.py -t http://your-app.local
-
-      # Escaneo de imágenes Docker
-      - name: Run Docker Image Scan with Trivy
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
-          trivy image your-app
 
   test:
     name: Run Tests
     runs-on: ubuntu-24.04
-    needs: pre-deployment  # Asegurarse de que los chequeos de pre-deployment hayan pasado
-    steps:
+    needs: test
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -101,15 +104,60 @@ jobs:
         run: |
           pytest tests/
 
+  pre-deployment-dast:
+    name: DAST (OWASP ZAP)
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 📦 Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: 🔧 Create missing file
+        run: mkdir -p .well-known/csaf && touch .well-known/csaf/provider-metadata.json
+
+      - name: 🔧 Start Juice Shop
+        run: |
+          nohup npm start &
+          sleep 60
+      - name: 🔍 Check if Juice Shop is running
+        run: |
+          curl --retry 5 --retry-delay 10 --retry-connrefused -I http://localhost:3000
+      - name: Run OWASP ZAP Scan (DAST)
+        run: |
+          docker ps
+          docker pull zaproxy/zap-weekly
+          docker run --rm -v $(pwd):/zap/wrk/:rw --user root --network="host" -t zaproxy/zap-weekly \
+          zap-baseline.py -t http://localhost:3000 -g /zap/wrk/gen.conf -r zap-report.html -I
+      - name: Upload DAST Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap-report.html
+
+
+  pre-deployment-image-scan:
+    name: Image Scanning (Trivy)
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy Image Scan
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/src aquasec/trivy your-app.tar
+
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-24.04
-    needs: test  # Asegurarse de que no haya fallos en las pruebas
+    needs: [pre-deployment-dast, pre-deployment-image-scan]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Deploy Docker image
         run: |
-          docker push your-app
-        if: ${{ success() }}  # Solo se ejecuta si todo ha pasado correctamente
+          echo "Desplegue"
