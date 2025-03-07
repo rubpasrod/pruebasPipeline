@@ -56,9 +56,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
           docker run --rm -v $(pwd):/src owasp/dependency-check:latest \
-          --scan /src --format JSON --project dvwa -o /src/dependency-check-report.json
+          --scan /src --format JSON --project dvwa -o /src/dependency-check-report.json \
+          --nvdApiKey "$NVD_API_KEY"  # Pasa la clave API al contenedor
 
       - name: Check for Critical Vulnerabilities (OWASP Dependency-Check)
         run: |
@@ -77,7 +80,7 @@ jobs:
   build:
     name: Build DVWA Image
     runs-on: ubuntu-24.04
-    needs: [pre-flight-sast, pre-flight-secrets]
+    needs: [pre-flight-sast, pre-flight-secrets, pre-flight-sca]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
