@@ -106,9 +106,11 @@ jobs:
           cd /home/runner/work/pruebasPipeline/pruebasPipeline/vulnerabilities/api
           composer update
           composer install
+          composer fund
 
       - name: Run PHP Unit Tests
         run: |
+          composer require --dev phpunit/phpunit
           vendor/bin/phpunit --configuration phpunit.xml
 
       - name: Run Integration Tests
