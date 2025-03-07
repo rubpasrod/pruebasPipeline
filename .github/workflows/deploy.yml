@@ -48,6 +48,31 @@ jobs:
           name: trufflehog-results
           path: trufflehog-results.json
 
+  pre-flight-sca:
+    name: Run SCA (OWASP Dependency-Check)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run OWASP Dependency-Check
+        run: |
+          docker run --rm -v $(pwd):/src owasp/dependency-check:latest \
+          --scan /src --format JSON --project dvwa -o /src/dependency-check-report.json
+
+      - name: Check for Critical Vulnerabilities (OWASP Dependency-Check)
+        run: |
+          if grep -q '"severity": "CRITICAL"' dependency-check-report.json; then
+            echo "Critical vulnerabilities found by OWASP Dependency-Check!"
+            exit 1
+          fi
+
+      - name: Upload SCA Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: dependency-check-report.json
+
 
   build:
     name: Build DVWA Image
