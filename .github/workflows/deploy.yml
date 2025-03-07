@@ -88,28 +88,28 @@ jobs:
           path: /tmp/dvwa-image/
 
 
-test:
-  name: Run DVWA Tests
-  runs-on: ubuntu-24.04
-  needs: build
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+  test:
+    name: Run DVWA Tests
+    runs-on: ubuntu-24.04
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y curl jq 
-        pip install -r requirements.txt || true
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y curl jq 
+          pip install -r requirements.txt || true
 
-    - name: Run Security Tests
-      run: |
-        pytest tests/
+      - name: Run Security Tests
+        run: |
+          pytest tests/
 
 
 
