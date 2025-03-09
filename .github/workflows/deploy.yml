@@ -54,27 +54,44 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+  
+      - name: Fix permissions before scan
+        run: sudo chmod -R 777 $(pwd)
+  
+      - name: Prepare Output Directory
+        run: mkdir -p $(pwd)/owasp-output
+  
+      - name: Force Update Dependency-Check DB
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          docker run --rm -v $(pwd):/src owasp/dependency-check:latest \
+          --updateonly --nvdApiKey "$NVD_API_KEY"
+  
       - name: Run OWASP Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: |
-          docker run --rm --user $(id -u):$(id -g) -v $(pwd):/src owasp/dependency-check:latest \
-          --scan /src --format JSON --project dvwa -o /src/dependency-check-report.json \
-          --nvdApiKey "$NVD_API_KEY" --log /src/dependency-check.log
-
+          docker run --rm -v $(pwd):/src owasp/dependency-check:latest \
+          --scan /src --format JSON --project dvwa -o /src/owasp-output/dependency-check-report.json \
+          --nvdApiKey "$NVD_API_KEY" --log /src/owasp-output/dependency-check.log
+  
+      - name: Print OWASP Log
+        run: cat owasp-output/dependency-check.log
+  
       - name: Check for Critical Vulnerabilities (OWASP Dependency-Check)
         run: |
-          if grep -q '"severity": "CRITICAL"' dependency-check-report.json; then
+          if grep -q '"severity": "CRITICAL"' owasp-output/dependency-check-report.json; then
             echo "Critical vulnerabilities found by OWASP Dependency-Check!"
             exit 1
           fi
-
+  
       - name: Upload SCA Report
         uses: actions/upload-artifact@v4
         with:
           name: dependency-check-report
-          path: dependency-check-report.json
+          path: owasp-output/dependency-check-report.json
+
 
 
   build:
