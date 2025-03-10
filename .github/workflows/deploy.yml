@@ -143,8 +143,9 @@ jobs:
 
       - name: Run URL Tests
         run: |
-          cd /home/runner/work/pruebasPipeline/pruebasPipeline/tests
+          cd $(git rev-parse --show-toplevel)/tests
           python3 -m pytest -s test_url.py || echo "Algunas pruebas fallaron, revisa los logs"
+
 
 
 
