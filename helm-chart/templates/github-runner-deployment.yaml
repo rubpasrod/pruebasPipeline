@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-runner
+  namespace: {{ .Values.runner.namespace }}
+  labels:
+    app: github-runner
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: github-runner
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: github-runner  
+    spec:
+      serviceAccountName: github-runner
+      containers:
+        - name: github-runner
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: RUNNER_SCOPE
+              value: "{{ .Values.runner.scope }}" 
+            - name: ORG_NAME
+              value: "{{ .Values.runner.orgName }}"  
+            - name: RUNNER_WORKDIR
+              value: "{{ .Values.runner.workDir }}"  
+            - name: RUNNER_NAME_PREFIX
+              value: "{{ .Values.runner.namePrefix }}"  
+            - name: RANDOM_RUNNER_SUFFIX
+              value: "{{ .Values.runner.randomSuffix }}" 
+            - name: LABELS
+              value: "{{ .Values.runner.labels }}" 
+            - name: APP_ID
+              valueFrom:
+                secretKeyRef:
+                  key: APP_ID
+                  name: github-app-credentials
+            - name: APP_LOGIN
+              valueFrom:
+                secretKeyRef:
+                  key: APP_LOGIN
+                  name: github-app-credentials
+            - name: APP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: APP_PRIVATE_KEY
+                  name: github-app-credentials
+            - name: INSTALLATION_ID
+              valueFrom:
+                secretKeyRef:
+                  key: INSTALLATION_ID
+                  name: github-app-credentials
+          volumeMounts:
+            - mountPath: /home/runner/_work
+              name: workspace
+            - mountPath: /start.sh
+              name: github-runner-script
+              subPath: start.sh
+          resources:
+            limits:
+              cpu: "{{ .Values.resources.limits.cpu }}"
+              memory: "{{ .Values.resources.limits.memory }}"
+            requests:
+              cpu: "{{ .Values.resources.requests.cpu }}"
+              memory: "{{ .Values.resources.requests.memory }}"
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - emptyDir: {}
+          name: workspace
+        - name: github-runner-script
+          configMap:
+            name: github-runner-config
+            items:
+              - key: start.sh
+                path: start.sh

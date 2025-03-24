@@ -1,0 +1,5 @@
+apiVersion: v2
+name: github-actions-runner
+description: A Helm chart for github actions runner
+version: 0.1.0
+appVersion: "1.0.0"

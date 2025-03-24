@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: github-runner-config
+  namespace: training
+  labels:
+    app: github-runner
+data:
+  RUNNER_WORKDIR: "/home/runner/_work"
+  start.sh: |
+    #!/bin/bash
+    set -e
+
+    # Check Github App credentials
+    if [ -z "${APP_ID}" ] || [ -z "${APP_PRIVATE_KEY}" ] || [ -z "${INSTALLATION_ID}" ]; then
+      echo 1>&2 "error: missing one of the GitHub App credentials (APP_ID, APP_PRIVATE_KEY, INSTALLATION_ID)"
+      exit 1
+    fi
+
+    # Build intallation token
+    TOKEN=$(curl -s -X POST \
+      -H "Accept: application/vnd.github.v3+json" \
+      -H "Authorization: Bearer $(python3 -c 'import jwt, time; print(jwt.encode({"iss": "'"$APP_ID"'", "iat": int(time.time())-60}, "'"$APP_PRIVATE_KEY"'", algorithm="RS256"))')" \
+      "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens" | jq -r '.token')
+
+    # Save the token
+    RUNNER_TOKEN_FILE="/runner/.token"
+    echo -n "$TOKEN" > "$RUNNER_TOKEN_FILE"
+
+    unset RUNNER_TOKEN
+
+    if [ -n "${RUNNER_WORKDIR}" ]; then
+      mkdir -p "${RUNNER_WORKDIR}"
+    fi
+
+    cleanup() {
+      trap "" EXIT
+      if [ -e ./config.sh ]; then
+        echo "Cleanup: Removing GitHub Actions runner..."
+        ./config.sh remove --token $(cat "${RUNNER_TOKEN_FILE}")
+      fi
+    }
+
+    echo "1. Downloading and extracting GitHub Actions runner..."
+    mkdir -p /actions-runner && cd /actions-runner
+    curl -o runner.tar.gz -L https://github.com/actions/runner/releases/download/v2.322.0/actions-runner-linux-x64-2.322.0.tar.gz
+    tar xzf runner.tar.gz
+    rm -f runner.tar.gz
+
+    trap "cleanup; exit 0" EXIT
+    trap "cleanup; exit 130" INT
+    trap "cleanup; exit 143" TERM
+
+    echo "2. Configuring GitHub Actions runner..."
+    ./config.sh --url "https://github.com/organizations/yggdrasilcorp" --token $(cat "${RUNNER_TOKEN_FILE}") --unattended --work "${RUNNER_WORKDIR}" --replace --org "yggdrasilcorp"
+
+    echo "3. Running GitHub Actions runner..."
+    ./run.sh & wait $!
