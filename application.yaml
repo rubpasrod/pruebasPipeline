@@ -13,7 +13,7 @@ spec:
       values: |
         runner:
           namespace: training
-          orgName: "yggdrasilcorp" 
+          orgName: "yggdrasilcorp"
   destination:
     server: https://kubernetes.default.svc
     namespace: training
